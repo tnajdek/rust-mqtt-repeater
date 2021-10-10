@@ -1,0 +1,37 @@
+{
+	"source": {
+		"clientID": "source-broker",
+		"host": "source.example.com",
+		"port": 8883,
+		"keepAlive": 5,
+		"auth": {
+			"login": "",
+			"password": ""
+		}
+	},
+	"destination": {
+		"clientID": "my-mqtt-broker",
+		"host": "my-mqtt.example.com",
+		"port": 8883,
+		"keepAlive": 30,
+		"cleanSession": true,
+		"connTimeout": 50,
+		"inflight": 200,
+		"auth": {
+			"type": "RSA",
+			"ca": "./cert/MyRootCA.pem",
+			"clientCert": "./cert/my-device.crt",
+			"clientKey": "./cert/my-device-private.pem"
+		}
+	},
+	"topics": [
+		{
+			"from": "devices/smart/foo/bar/42/connected",
+			"to": "home/foobar/connected"
+		},
+		{
+			"from": "devices/smart/foo/bar/42/active",
+			"to": "home/foobar/active"
+		}
+	]
+}
