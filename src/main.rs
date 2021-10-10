@@ -1,13 +1,13 @@
-extern crate clap;
-use std::str; use rumqttc::{ self, AsyncClient, Event, EventLoop, MqttOptions, Packet, SubscribeFilter, Key, TlsConfiguration, Transport, QoS };
 use std::collections::HashMap;
-use tokio::{task};
-use rustls::ClientConfig;
 use std::fs;
 use std::path::Path;
-use clap::{Arg, App};
+use std::str;
 
+use clap::{Arg, App};
+use rumqttc::{ self, AsyncClient, Event, EventLoop, MqttOptions, Packet, SubscribeFilter, Key, TlsConfiguration, Transport, QoS };
+use rustls::ClientConfig;
 use serde::{Deserialize, Serialize};
+use tokio::{task};
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
