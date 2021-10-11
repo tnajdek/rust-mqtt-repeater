@@ -31,7 +31,17 @@
 		},
 		{
 			"from": "devices/smart/foo/bar/42/active",
-			"to": "home/foobar/active"
+			"to": "home/foobar/active",
+			"payload": {
+				"behaviour": "invertBoolean"
+			}
+		},
+		{
+			"from": "devices/smart/foo/bar/42/name",
+			"to": "home/foobar/active",
+			"payload": {
+				"string": "foobar"
+			}
 		}
 	]
 }

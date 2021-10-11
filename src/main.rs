@@ -64,11 +64,33 @@ impl ConnectionConfig {
     fn default_clean_session() -> bool { true }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+enum Behaviour {
+    Copy,
+    Omit,
+    InvertBoolean
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+enum Payload {
+    Bytes(Vec<u8>),
+    String(String),
+    Behaviour(Behaviour)
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct Topic {
     from: String,
     to: String,
+    #[serde(default = "Topic::default_payload")]
+    payload: Payload
+}
+
+impl Topic {
+    fn default_payload() -> Payload { Payload::Behaviour(Behaviour::Copy) }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -109,14 +131,14 @@ async fn main() {
             println!("Unable to read config file from {}: {}", config_file_path.display(), e);
             return;
         }
-    }    
-
+    
+    }
     let config : Config = serde_json::from_str(&config_string).expect("Failed to parse config");
 
-    let (src_client, mut src_eventloop) = make_client(config.source);
-    let (dest_client, mut dest_eventloop) = make_client(config.destination);
+    let (src_client, mut src_eventloop) = make_client(&config.source);
+    let (dest_client, mut dest_eventloop) = make_client(&config.destination);
 
-    let topics_lookup = config.topics.iter().map(|t| (t.from.clone(), t.to.clone())).collect::<HashMap<_, _>>();
+    let topics_lookup = config.topics.iter().map(|t| (t.from.clone(), (t.to.clone(), t.payload.clone()))).collect::<HashMap<_, _>>();
 
     src_client.subscribe_many(config.topics
         .iter()
@@ -135,14 +157,33 @@ async fn main() {
                     if let Packet::Publish(publish) = packet {
                         if let Some(t) = topics_lookup.get(&publish.topic) {
                             if is_verbose {
-                                println!("[SRC->DEST] {}", t);
+                                println!("[SRC->DEST] {:?}", t);
                             }
-                            dest_client.publish_bytes(t, QoS::AtLeastOnce, publish.retain, publish.payload).await.expect("Failed to publish to destination");
+                            let to = &t.0;
+                            let payload_behaviour = &t.1;
+                            let new_payload = match payload_behaviour {
+                                Payload::Behaviour(Behaviour::Copy) => publish.payload,
+                                Payload::Behaviour(Behaviour::Omit) => String::from("").into(),
+                                Payload::Behaviour(Behaviour::InvertBoolean) => {
+                                    let payload_string = match String::from_utf8_lossy(&publish.payload).to_lowercase().as_str() {
+                                        "false" | "0" => String::from("true"),
+                                        "true" | "1" => String::from("false"),
+                                        _ => String::from(""),
+                                    };
+                                    payload_string.into()
+                                },
+                                Payload::String(payload_string) => payload_string.clone().into(),
+                                Payload::Bytes(bytes) => bytes.to_owned().into(),
+                            };
+
+                            dest_client
+                                .publish_bytes(to, QoS::AtLeastOnce, publish.retain, new_payload)
+                                .await
+                                .expect("Failed to publish to destination");
                         }
                     }
                 }
             }
-            
             task::yield_now().await;
         }
     });
@@ -161,18 +202,18 @@ async fn main() {
     let (_first, _second) = tokio::join!(t1, t2);
 }
 
-fn make_client(connection_cfg: ConnectionConfig) -> (AsyncClient, EventLoop) {
-    let mut mqttoptions = MqttOptions::new(connection_cfg.client_id, connection_cfg.host, connection_cfg.port);
+fn make_client(connection_cfg: &ConnectionConfig) -> (AsyncClient, EventLoop) {
+    let mut mqttoptions = MqttOptions::new(&connection_cfg.client_id, &connection_cfg.host, connection_cfg.port);
     mqttoptions.set_keep_alive(connection_cfg.keep_alive);
     mqttoptions.set_inflight(connection_cfg.inflight);
     mqttoptions.set_clean_session(connection_cfg.clean_session);
 
-    if let Auth::AuthPassword { login, password } = connection_cfg.auth {
+    if let Auth::AuthPassword { login, password } = &connection_cfg.auth {
         let mut client_config = ClientConfig::new();
         client_config.root_store = rustls_native_certs::load_native_certs().expect("Failed to load platform certificates.");
         mqttoptions.set_credentials(login, password);
         mqttoptions.set_transport(Transport::tls_with_config(client_config.into()));
-    } else if let Auth::AuthCertificate { ca, client_cert, client_key, key_type } = connection_cfg.auth {
+    } else if let Auth::AuthCertificate { ca, client_cert, client_key, key_type } = &connection_cfg.auth {
         let ca_bytes = fs::read(ca).expect("Failed to read CA certificate file");
         let client_cert_bytes = fs::read(client_cert).expect("Failed to read client certificate file");
         let client_key_bytes = fs::read(client_key).expect("Failed to read client key file");

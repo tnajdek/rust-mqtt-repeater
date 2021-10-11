@@ -37,6 +37,17 @@ To authenticate with credentials, `auth` key should contain `login` and `passwor
 | clientCert* | Certificate for this device       | -       |
 | clientKey*  | Private key for this device       | -       |
 
+**topics**
+
+Topics should be an array of objects, where each object has the following keys: `to`, `from` to select topics to subscibe to at source and publish to at destination and optionally `payload` to define how to treat payload. If present, `payload` must be an object with a single key, one of the following: `behaviour`, `string` (value must be string), `bytes` (value must be array of bytes). If key is `behaviour`, it must have one of the following values:
+
+| Parameter     | Description                                                                             |
+|---------------|-----------------------------------------------------------------------------------------|
+| copy          | Copy payload from source to destination                                                 |
+| omit          | Always publish empty payload                                                            |
+| invertBoolean | Attempt to "flip" a boolean value. Payloads "true"/"false" and "1"/"0" are recognized.  |
+
+
 **Example**
 
 See sample-config.json for example configuration.
