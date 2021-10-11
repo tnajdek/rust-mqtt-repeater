@@ -2,6 +2,7 @@
 name = "rust-mqtt-repeater"
 version = "0.1.0"
 edition = "2018"
+license = "MIT"
 
 [dependencies]
 tokio = { version = "1.12.0", features = ["full"] }
