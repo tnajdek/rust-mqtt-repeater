@@ -18,7 +18,7 @@
 		"connTimeout": 50,
 		"inflight": 200,
 		"auth": {
-			"type": "RSA",
+			"keyType": "RSA",
 			"ca": "./cert/MyRootCA.pem",
 			"clientCert": "./cert/my-device.crt",
 			"clientKey": "./cert/my-device-private.pem"

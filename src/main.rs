@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use tokio::{task};
 
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
 enum KeyType { RSA, ECC }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -85,7 +84,7 @@ struct Config {
 async fn main() {
         let matches = App::new("Rust MQTT Repeater")
             .version("0.1")
-            .about("Subscribes to selected topics at one MQTT broker and publishes events to another broker. Connection details and topics are read form a config file. See sample-config.json")
+            .about("Subscribes to selected topics at one MQTT broker and publishes events to another broker. Connection details and topics are read from a config file. See sample-config.json")
             .arg(Arg::with_name("config")
                 .short("c")
                 .long("config")
