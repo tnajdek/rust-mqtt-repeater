@@ -60,7 +60,7 @@ impl ConnectionConfig {
     fn default_keep_alive() -> u16 { 30 }
     fn default_conn_timeout() -> u64 { 5 }
     fn default_inflight() -> u16 { 100 }
-    fn default_port() -> u16 { 883 }
+    fn default_port() -> u16 { 8883 }
     fn default_clean_session() -> bool { true }
 }
 
