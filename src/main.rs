@@ -9,6 +9,8 @@ use rustls::ClientConfig;
 use serde::{Deserialize, Serialize};
 use tokio::{task};
 
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
 #[derive(Serialize, Deserialize, Debug)]
 enum KeyType { RSA, ECC }
 
@@ -105,7 +107,7 @@ struct Config {
 #[tokio::main]
 async fn main() {
         let matches = App::new("Rust MQTT Repeater")
-            .version("0.1")
+            .version(VERSION)
             .about("Subscribes to selected topics at one MQTT broker and publishes events to another broker. Connection details and topics are read from a config file. See sample-config.json")
             .arg(Arg::with_name("config")
                 .short("c")
@@ -195,7 +197,6 @@ async fn main() {
 
     let t2 = task::spawn(async move {
         loop {
-            
             match dest_eventloop.poll().await {
                  Ok(dest_notification) => {
                     if is_verbose {
