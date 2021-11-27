@@ -148,40 +148,45 @@ async fn main() {
 
     let t1 = task::spawn(async move {
         loop {
-            if let Ok(src_notification) = src_eventloop.poll().await {
-                if is_verbose {
-                    print_event("SRC", &src_notification);
-                }
-                
-                if let Event::Incoming(packet) = src_notification {
-                    if let Packet::Publish(publish) = packet {
-                        if let Some(t) = topics_lookup.get(&publish.topic) {
-                            if is_verbose {
-                                println!("[SRC->DEST] {:?}", t);
-                            }
-                            let to = &t.0;
-                            let payload_behaviour = &t.1;
-                            let new_payload = match payload_behaviour {
-                                Payload::Behaviour(Behaviour::Copy) => publish.payload,
-                                Payload::Behaviour(Behaviour::Omit) => String::from("").into(),
-                                Payload::Behaviour(Behaviour::InvertBoolean) => {
-                                    let payload_string = match String::from_utf8_lossy(&publish.payload).to_lowercase().as_str() {
-                                        "false" | "0" => String::from("true"),
-                                        "true" | "1" => String::from("false"),
-                                        _ => String::from(""),
-                                    };
-                                    payload_string.into()
-                                },
-                                Payload::String(payload_string) => payload_string.clone().into(),
-                                Payload::Bytes(bytes) => bytes.to_owned().into(),
-                            };
+            match src_eventloop.poll().await {
+                Ok(src_notification) => {
+                    if is_verbose {
+                        print_event("SRC", &src_notification);
+                    }
+                    
+                    if let Event::Incoming(packet) = src_notification {
+                        if let Packet::Publish(publish) = packet {
+                            if let Some(t) = topics_lookup.get(&publish.topic) {
+                                if is_verbose {
+                                    println!("[SRC->DEST] {:?}", t);
+                                }
+                                let to = &t.0;
+                                let payload_behaviour = &t.1;
+                                let new_payload = match payload_behaviour {
+                                    Payload::Behaviour(Behaviour::Copy) => publish.payload,
+                                    Payload::Behaviour(Behaviour::Omit) => String::from("").into(),
+                                    Payload::Behaviour(Behaviour::InvertBoolean) => {
+                                        let payload_string = match String::from_utf8_lossy(&publish.payload).to_lowercase().as_str() {
+                                            "false" | "0" => String::from("true"),
+                                            "true" | "1" => String::from("false"),
+                                            _ => String::from(""),
+                                        };
+                                        payload_string.into()
+                                    },
+                                    Payload::String(payload_string) => payload_string.clone().into(),
+                                    Payload::Bytes(bytes) => bytes.to_owned().into(),
+                                };
 
-                            dest_client
-                                .publish_bytes(to, QoS::AtLeastOnce, publish.retain, new_payload)
-                                .await
-                                .expect("Failed to publish to destination");
+                                dest_client
+                                    .publish_bytes(to, QoS::AtLeastOnce, publish.retain, new_payload)
+                                    .await
+                                    .expect("Failed to publish to destination");
+                            }
                         }
                     }
+                },
+                Err(connection_error) => {
+                    println!("[SRC CONNECTION_ERROR] {}", connection_error.to_string());
                 }
             }
             task::yield_now().await;
@@ -190,12 +195,19 @@ async fn main() {
 
     let t2 = task::spawn(async move {
         loop {
-            if let Ok(dest_notification) = dest_eventloop.poll().await {
-                if is_verbose {
-                    print_event("DEST", &dest_notification);
+            
+            match dest_eventloop.poll().await {
+                 Ok(dest_notification) => {
+                    if is_verbose {
+                        print_event("DEST", &dest_notification);
+                    }
+                },
+                Err(connection_error) => {
+                    println!("[DEST CONNECTION_ERROR] {}", connection_error.to_string());
                 }
-                task::yield_now().await;
             }
+                            
+            task::yield_now().await;
         }
     });
 
