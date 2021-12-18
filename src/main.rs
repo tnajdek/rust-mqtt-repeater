@@ -142,12 +142,6 @@ async fn main() {
 
     let topics_lookup = config.topics.iter().map(|t| (t.from.clone(), (t.to.clone(), t.payload.clone()))).collect::<HashMap<_, _>>();
 
-    src_client.subscribe_many(config.topics
-        .iter()
-        .map(|t| SubscribeFilter { path: t.from.clone(), qos: QoS::AtLeastOnce })
-        .collect::<Vec<_>>()
-    ).await.expect("Failed to subscribe to source topics");
-
     let t1 = task::spawn(async move {
         loop {
             match src_eventloop.poll().await {
@@ -157,7 +151,15 @@ async fn main() {
                     }
                     
                     if let Event::Incoming(packet) = src_notification {
-                        if let Packet::Publish(publish) = packet {
+                        if let Packet::ConnAck(connack) = packet {
+                            if connack.code == rumqttc::v4::ConnectReturnCode::Success {
+                                src_client.subscribe_many(config.topics
+                                    .iter()
+                                    .map(|t| SubscribeFilter { path: t.from.clone(), qos: QoS::AtLeastOnce })
+                                    .collect::<Vec<_>>()
+                                ).await.expect("Failed to subscribe to source topics");
+                            }
+                        } else if let Packet::Publish(publish) = packet {
                             if let Some(t) = topics_lookup.get(&publish.topic) {
                                 if is_verbose {
                                     println!("[SRC->DEST] {:?}", t);
