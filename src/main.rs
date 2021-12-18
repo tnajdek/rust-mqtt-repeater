@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::str;
+use std::time::Duration;
 
 use clap::{Arg, App};
 use rumqttc::{ self, AsyncClient, Event, EventLoop, MqttOptions, Packet, SubscribeFilter, Key, TlsConfiguration, Transport, QoS };
@@ -48,7 +49,7 @@ struct ConnectionConfig {
     #[serde(default = "ConnectionConfig::default_port")]
     port: u16,
     #[serde(default = "ConnectionConfig::default_keep_alive")]
-    keep_alive: u16,
+    keep_alive: u64,
     #[serde(default = "ConnectionConfig::default_clean_session")]
     clean_session: bool,
     #[serde(default = "ConnectionConfig::default_conn_timeout")]
@@ -59,7 +60,7 @@ struct ConnectionConfig {
 
 impl ConnectionConfig {
     fn default_client_id() -> String { String::from("rust-mqtt-repeater") }
-    fn default_keep_alive() -> u16 { 30 }
+    fn default_keep_alive() -> u64 { 30 }
     fn default_conn_timeout() -> u64 { 5 }
     fn default_inflight() -> u16 { 100 }
     fn default_port() -> u16 { 8883 }
@@ -219,13 +220,20 @@ async fn main() {
 
 fn make_client(connection_cfg: &ConnectionConfig) -> (AsyncClient, EventLoop) {
     let mut mqttoptions = MqttOptions::new(&connection_cfg.client_id, &connection_cfg.host, connection_cfg.port);
-    mqttoptions.set_keep_alive(connection_cfg.keep_alive);
+    mqttoptions.set_keep_alive(Duration::new(connection_cfg.keep_alive, 0));
     mqttoptions.set_inflight(connection_cfg.inflight);
     mqttoptions.set_clean_session(connection_cfg.clean_session);
+    
 
     if let Auth::AuthPassword { login, password } = &connection_cfg.auth {
+        let mut roots = rustls::RootCertStore::empty();
+        for cert in rustls_native_certs::load_native_certs().expect("Failed to load platform certs") {
+            roots
+                .add(&rustls::Certificate(cert.0))
+                .expect("Failed to add platform cert");
+        }
         let mut client_config = ClientConfig::new();
-        client_config.root_store = rustls_native_certs::load_native_certs().expect("Failed to load platform certificates.");
+        client_config.root_store = roots;
         mqttoptions.set_credentials(login, password);
         mqttoptions.set_transport(Transport::tls_with_config(client_config.into()));
     } else if let Auth::AuthCertificate { ca, client_cert, client_key, key_type } = &connection_cfg.auth {
